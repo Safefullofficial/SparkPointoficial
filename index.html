@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SparkPoint</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Стили для модального окна правил */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
+        .modal-content { background: #1a1a1a; margin: 10% auto; padding: 20px; border: 1px solid #ffcc00; width: 85%; max-width: 500px; border-radius: 15px; color: #fff; }
+        .close { color: #aaa; float: right; font-size: 28px; cursor: pointer; }
+        .rules-text { font-size: 14px; line-height: 1.5; color: #ccc; margin-top: 15px; }
+        .rules-item { margin-bottom: 10px; border-left: 2px solid #ffcc00; padding-left: 10px; }
+    </style>
 </head>
 <body>
     <nav>
@@ -29,92 +37,115 @@
             </div>
             <div class="card">
                 <h3>📊 Уровень</h3>
-                <div class="level">
+                <div id="level-display" class="level">
                     <span id="level" class="level-badge">0</span>
-                    <div class="progress"><div id="progress-bar"></div></div>
                 </div>
             </div>
         </div>
 
         <div class="content">
-            <div class="card">
-                <h3>🔗 Реферальная ссылка</h3>
-                <div class="referral">
-                    <input type="text" id="ref-link" readonly>
-                    <button onclick="copyLink()" class="btn-gold">Копировать</button>
-                </div>
-            </div>
-
             <div class="card" id="register-card">
                 <h3>📝 Регистрация</h3>
                 <input type="text" id="upline" placeholder="Адрес пригласителя">
-                <button onclick="register()" class="btn-green">Зарегистрироваться (0.1 BNB)</button>
+                
+                <div style="margin: 15px 0; font-size: 13px; color: #aaa; display: flex; align-items: flex-start;">
+                    <input type="checkbox" id="accept-rules" style="margin-top: 4px; margin-right: 10px;" onchange="toggleRegButton()">
+                    <label for="accept-rules">Мне есть 21+ лет и я принимаю <a href="#" onclick="openModal(); return false;" style="color: #ffcc00; text-decoration: underline;">правила и условия проекта</a></label>
+                </div>
+
+                <button id="reg-button" onclick="register()" class="btn-green" disabled style="opacity: 0.5;">Зарегистрироваться (0.1 BNB)</button>
             </div>
 
             <div class="card" id="stats-card" style="display: none;">
-                <h3>📈 Статистика</h3>
+                <h3>📈 Ваша статистика</h3>
                 <div class="stats">
                     <div class="stat"><h4 id="refs">0</h4><p>Рефералы</p></div>
                     <div class="stat"><h4 id="team">0</h4><p>Команда</p></div>
                     <div class="stat"><h4 id="earned">0</h4><p>Заработано</p></div>
                 </div>
+                <div style="margin-top: 20px;">
+                    <p>Реферальная ссылка:</p>
+                    <input type="text" id="ref-link" readonly style="width: 70%; padding: 5px;">
+                    <button onclick="copyLink()" class="btn-gold" style="padding: 5px 10px;">Копировать</button>
+                </div>
             </div>
 
             <div class="card admin-card" id="admin-panel" style="display: none;">
-                <h3>⚙️ Админ</h3>
-                <input type="text" id="new-user" placeholder="Новый пользователь">
-                <input type="text" id="new-upline" placeholder="Пригласитель">
+                <h3>⚙️ Панель Администратора</h3>
+                <input type="text" id="new-user" placeholder="Адрес нового юзера">
+                <input type="text" id="new-upline" placeholder="Адрес пригласителя">
                 <button onclick="addFree()" class="btn-green">Добавить бесплатно</button>
             </div>
+        </div>
+    </div>
+
+    <div id="rulesModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 style="color: #ffcc00;">📜 Правила SparkPoint</h2>
+            <div class="rules-text">
+                <div class="rules-item"><b>Не инвестиция:</b> Платформа является децентрализованной игрой. Мы не обещаем доход.</div>
+                <div class="rules-item"><b>21+:</b> Проект не рекомендован лицам младше 21 года.</div>
+                <div class="rules-item"><b>Риски:</b> Вы несете полную ответственность за свои средства. Взносы 0.1 BNB являются добровольными.</div>
+                <div class="rules-item"><b>Авто-апгрейд:</b> Вы соглашаетесь, что часть баланса используется системой для повышения вашего уровня.</div>
+            </div>
+            <button onclick="closeModal()" class="btn-gold" style="width: 100%; margin-top: 15px;">Ясно</button>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.0/dist/web3.min.js"></script>
     <script>
         let web3, contract, user;
-        const CONTRACT_ADDRESS = "ВАШ_АДРЕС_КОНТРАКТА"; 
-        const CONTRACT_ABI = []; 
+        const CONTRACT_ADDRESS = "ВАШ_АДРЕС_ПОСЛЕ_ДЕПЛОЯ"; 
+        const CONTRACT_ABI = []; // Сюда вставишь ABI из Remix
+
+        function toggleRegButton() {
+            const isChecked = document.getElementById('accept-rules').checked;
+            const btn = document.getElementById('reg-button');
+            btn.disabled = !isChecked;
+            btn.style.opacity = isChecked ? "1" : "0.5";
+        }
+
+        function openModal() { document.getElementById("rulesModal").style.display = "block"; }
+        function closeModal() { document.getElementById("rulesModal").style.display = "none"; }
 
         async function connectWallet() {
             if (window.ethereum) {
-                try {
-                    web3 = new Web3(window.ethereum);
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    user = accounts[0];
-                    document.getElementById('wallet').textContent = user.slice(0, 6) + '...' + user.slice(-4);
-                    contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
-                    loadData();
-                } catch (e) { console.log("Вход отменен"); }
-            } else { alert("Установите MetaMask"); }
+                web3 = new Web3(window.ethereum);
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                user = accounts[0];
+                document.getElementById('wallet').textContent = user.slice(0, 6) + '...' + user.slice(-4);
+                contract = new web3.eth.Contract(CONTRACT_ABI, CONTRACT_ADDRESS);
+                loadData();
+            } else { alert("Установите MetaMask!"); }
         }
 
         async function loadData() {
             try {
                 const userData = await contract.methods.users(user).call();
-                if (userData && userData.active) {
-                    document.getElementById('profile').innerHTML = `<p>Уровень: ${userData.level}</p>`;
+                if (userData.active) {
+                    document.getElementById('register-card').style.display = 'none';
+                    document.getElementById('stats-card').style.display = 'block';
                     document.getElementById('balance').textContent = web3.utils.fromWei(userData.balance, 'ether') + ' BNB';
                     document.getElementById('level').textContent = userData.level;
                     document.getElementById('refs').textContent = userData.referrals;
                     document.getElementById('team').textContent = userData.totalTeam;
                     document.getElementById('earned').textContent = web3.utils.fromWei(userData.balance, 'ether') + ' BNB';
-                    
-                    document.getElementById('register-card').style.display = 'none';
-                    document.getElementById('stats-card').style.display = 'block';
-                    
+                    document.getElementById('ref-link').value = window.location.origin + window.location.pathname + "?ref=" + user;
+
                     const admin = await contract.methods.admin().call();
                     if (user.toLowerCase() === admin.toLowerCase()) {
                         document.getElementById('admin-panel').style.display = 'block';
                     }
                 }
-            } catch (e) { console.log("Контракт пока не подключен"); }
+            } catch (e) { console.log("Контракт не найден или вы не зарегистрированы"); }
         }
 
         function copyLink() {
-            const link = document.getElementById('ref-link');
-            link.select();
-            document.execCommand('copy');
-            alert('Скопировано!');
+            const copyText = document.getElementById("ref-link");
+            copyText.select();
+            document.execCommand("copy");
+            alert("Ссылка скопирована!");
         }
 
         document.getElementById('connect').onclick = connectWallet;
